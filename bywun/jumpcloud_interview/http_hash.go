@@ -18,7 +18,6 @@ const SleepDuration = 5
 //Seconds to wait on shutdown so that sending of response can happen
 const SleepShutdown = 5
 
-
 var srv *http.Server
 
 //Variables related to graceful shutdown
@@ -39,7 +38,6 @@ var gRequestsTime time.Duration
 //For generating the key in the hash table
 var gKey int
 var gKeyLock sync.Mutex
-
 
 func hash512(pass string) (string, error) {
 	hasher := sha512.New()
@@ -63,14 +61,16 @@ func decHashers(i int) {
 	gShutdownMutex.Unlock()
 }
 
-func incHashers(i int) {
+//Return true if incremented. False if shutdown in progress
+func incHashers(i int) bool {
 	gShutdownMutex.Lock()
 	if gShutdown {
 		gShutdownMutex.Unlock()
-		return;
+		return false;
 	}
 	gNumHashers += i;
 	gShutdownMutex.Unlock()
+	return true
 }
 
 func hashPass(pass string, key int, starttime time.Time) {
@@ -94,7 +94,9 @@ func hashPass(pass string, key int, starttime time.Time) {
 }
 
 func handleHash(writer http.ResponseWriter, request *http.Request) {
-	incHashers(2)
+	if !incHashers(2) {
+		return
+	}
 
 	starttime := time.Now()
 	err := request.ParseForm()
@@ -131,7 +133,9 @@ func handleHash(writer http.ResponseWriter, request *http.Request) {
 }
 
 func handleGetHash(writer http.ResponseWriter, request *http.Request) {
-	incHashers(1)
+	if !incHashers(1) {
+		return
+	}
 	keystring := request.URL.Path[len("/hash/"):]
 	key, err := strconv.Atoi(keystring)
 	if err != nil {
@@ -160,7 +164,9 @@ func handleShutdown(writer http.ResponseWriter, request *http.Request) {
 }
 
 func handleStats(writer http.ResponseWriter, request *http.Request) {
-	incHashers(1)
+	if !incHashers(1) {
+		return
+	}
 
 	gStatsLock.Lock()
 	avg := 0
