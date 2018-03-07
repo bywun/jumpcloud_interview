@@ -54,7 +54,7 @@ func hash512(pass string) (string, error) {
 // before a graceful shutdown can occur
 func decHashers(i int) {
 	gShutdownMutex.Lock()
-	gNumHashers -= i;
+	gNumHashers -= i
 	if gShutdown {
 		gShutdownCond.Signal()
 	}
@@ -66,9 +66,9 @@ func incHashers(i int) bool {
 	gShutdownMutex.Lock()
 	if gShutdown {
 		gShutdownMutex.Unlock()
-		return false;
+		return false
 	}
-	gNumHashers += i;
+	gNumHashers += i
 	gShutdownMutex.Unlock()
 	return true
 }
@@ -87,7 +87,7 @@ func hashPass(pass string, key int, starttime time.Time) {
 		endtime := time.Now()
 		duration := endtime.Sub(starttime)
 		gStatsLock.Lock()
-		gRequestsTotal++;
+		gRequestsTotal++
 		gRequestsTime += duration
 		gStatsLock.Unlock()
 		decHashers(1)
@@ -158,7 +158,7 @@ func handleGetHash(writer http.ResponseWriter, request *http.Request) {
 }
 func handleShutdown(writer http.ResponseWriter, request *http.Request) {
 	gShutdownCond.L.Lock()
-	gShutdown = true;
+	gShutdown = true
 	gShutdownCond.Signal()
 	gShutdownCond.L.Unlock()
 }
