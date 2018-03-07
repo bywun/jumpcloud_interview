@@ -53,32 +53,31 @@ func hash512(pass string) (string, error) {
 // active threads in the system that need to complete
 // before a graceful shutdown can occur
 func decHashers(i int) {
-	gShutdownMutex.Lock()
+	gShutdownCond.L.Lock()
+	defer gShutdownCond.L.Unlock()
 	gNumHashers -= i
 	if gShutdown {
 		gShutdownCond.Signal()
 	}
-	gShutdownMutex.Unlock()
 }
 
 //Return true if incremented. False if shutdown in progress
 func incHashers(i int) bool {
 	gShutdownMutex.Lock()
+	defer gShutdownMutex.Unlock()
 	if gShutdown {
-		gShutdownMutex.Unlock()
 		return false
 	}
 	gNumHashers += i
-	gShutdownMutex.Unlock()
 	return true
 }
 
 func hashPass(pass string, key int, starttime time.Time) {
+		defer decHashers(1)
 		time.Sleep(time.Second * SleepDuration)
 		hash, err := hash512(pass)
 		if err != nil {
 			log.Printf("Failed to hash password %s", pass)
-			decHashers(1)
 			return
 		}
 		gPassTableLock.Lock()
@@ -90,7 +89,6 @@ func hashPass(pass string, key int, starttime time.Time) {
 		gRequestsTotal++
 		gRequestsTime += duration
 		gStatsLock.Unlock()
-		decHashers(1)
 }
 
 func handleHash(writer http.ResponseWriter, request *http.Request) {
@@ -136,12 +134,12 @@ func handleGetHash(writer http.ResponseWriter, request *http.Request) {
 	if !incHashers(1) {
 		return
 	}
+	defer decHashers(1)
 	keystring := request.URL.Path[len("/hash/"):]
 	key, err := strconv.Atoi(keystring)
 	if err != nil {
 		log.Printf("Bad key lookup %s", keystring)
 		http.NotFound(writer, request)
-		decHashers(1)
 		return
 	}
 	gPassTableLock.Lock()
@@ -150,11 +148,9 @@ func handleGetHash(writer http.ResponseWriter, request *http.Request) {
 	if !ok {
 		log.Printf("Key not found %s", keystring)
 		http.NotFound(writer, request)
-		decHashers(1)
 		return
 	}
 	fmt.Fprintf(writer, "%s", hash)
-	decHashers(1)
 }
 func handleShutdown(writer http.ResponseWriter, request *http.Request) {
 	gShutdownCond.L.Lock()
@@ -167,6 +163,7 @@ func handleStats(writer http.ResponseWriter, request *http.Request) {
 	if !incHashers(1) {
 		return
 	}
+	defer decHashers(1)
 
 	gStatsLock.Lock()
 	avg := 0
@@ -184,7 +181,6 @@ func handleStats(writer http.ResponseWriter, request *http.Request) {
 		http.Error(writer, err.Error(),
 		    http.StatusInternalServerError)
 	}
-	decHashers(1)
 }
 
 func main() {
