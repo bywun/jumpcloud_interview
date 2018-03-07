@@ -1,0 +1,9 @@
+To run the program:
+./jumpcloud_interview
+There is an optional -addr argument to add the address/port to listen:
+./jumpcloud_interview -addr=:8080
+The default is :8080
+
+Also, please note that the problem definition was unclear about whether we should track the time needed to return the key to the client or time elapsed until the hash is entered into the table for the stats query. I opted to time the latter. 
+
+
